@@ -13,6 +13,7 @@ SELECT sum(rp.total_horas) AS total_horas_traba,
    FROM registro_ponto rp
      JOIN funcionario f ON rp.nome_ref = f.id
   GROUP BY rp.nome_ref, f.nome, f.funcao;
+
 | pg_get_viewdef                                                                                                                   |
   
 |
@@ -30,6 +31,10 @@ group by
 
 |
 |SELECT pg_get_functiondef('update_hours'::regproc);
+|
+
+|
+| Criando table app_data
 |
 create table public.app_data (
   id bigint generated always as identity not null,
@@ -63,6 +68,32 @@ BEGIN
         NEW.hora_extra := interval '0';
     END IF;
     RETURN NEW;
+END;
+$function$
+
+|
+| function calculate_hours()
+|
+    
+CREATE OR REPLACE FUNCTION public.calculate_hours()
+ RETURNS trigger
+ LANGUAGE plpgsql
+AS $function$
+BEGIN
+  -- Calculate total hours
+  IF NEW.inicio_dia IS NOT NULL AND NEW.saida IS NOT NULL THEN
+    NEW.total_horas := (NEW.saida - NEW.inicio_dia) - (NEW.retorno - NEW.almoco);
+  END IF;
+
+  -- Calculate extra hours assuming 8 hours is the standard workday
+  IF NEW.total_horas IS NOT NULL THEN
+    NEW.hora_extra := NEW.total_horas - interval '8 hours';
+    IF NEW.hora_extra < interval '0 hours' THEN
+      NEW.hora_extra := interval '0 hours';
+    END IF;
+  END IF;
+
+  RETURN NEW;
 END;
 $function$
 
